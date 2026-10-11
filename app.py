@@ -101,7 +101,7 @@ def get_model():
             print(f"JSON fail {e}, trying direct")
             import traceback; traceback.print_exc()
             co={'DTypePolicy':tf.keras.mixed_precision.Policy('float32')}
-            model=tf.keras.models.load_model('model.h5',compile=False,custom_objects=co)
+            model=tf.keras.models.load_model('model_fixed.h5',compile=False,custom_objects=co)
             print("LOADED DIRECT!")
     return model
 
