@@ -3,67 +3,67 @@ import numpy as np
 from flask import Flask, request
 import tensorflow as tf
 
-print("PATCHING - FINAL V3...")
+print("PATCHING V4 - DTypePolicy + GlorotUniform...")
 
-# --- SUPER PATCH: from_config ko bhi patch karo ---
-def patch_all():
-    import keras.initializers
-    from keras.initializers import initializers_v2
-    from keras.engine.input_layer import InputLayer
-    
-    # 1. InputLayer
-    orig_il = InputLayer.__init__
-    def new_il(self, *a, **kw):
-        kw.pop('batch_shape', None)
-        kw.pop('batch_input_shape', None)
-        if 'batch_shape' in kw: kw['batch_input_shape'] = kw.pop('batch_shape')
-        # also handle if both missing, ignore
-        kw.pop('batch_shape', None)
-        kw.pop('optional', None)
-        return orig_il(self, *a, **kw)
-    InputLayer.__init__ = new_il
+# --- PATCH 1: GlorotUniform input_axes/output_axes ---
+def patch_initializers():
+    try:
+        from keras.initializers import initializers_v2
+        from keras.engine.input_layer import InputLayer
+        orig_from_config = initializers_v2.Initializer.from_config
+        @classmethod
+        def new_from_config(cls, config):
+            config = dict(config)
+            for k in ['input_axes','output_axes','dtype','distribution']:
+                config.pop(k, None)
+            return orig_from_config.__func__(cls, config)
+        initializers_v2.Initializer.from_config = new_from_config
+        print("Initializer patched")
+        
+        orig_il = InputLayer.__init__
+        def new_il(self, *a, **kw):
+            kw.pop('batch_shape', None)
+            kw.pop('batch_input_shape', None)
+            kw.pop('optional', None)
+            return orig_il(self, *a, **kw)
+        InputLayer.__init__ = new_il
+    except Exception as e:
+        print(f"Init patch fail: {e}")
 
-    # 2. Patch Initializer.from_config - YAHI ASLI FIX HAI
-    orig_from_config = initializers_v2.Initializer.from_config
-    @classmethod
-    def new_from_config(cls, config):
-        # Purane faltu keys hatao
-        config = dict(config)  # copy
-        config.pop('input_axes', None)
-        config.pop('output_axes', None)
-        config.pop('dtype', None)
-        config.pop('distribution', None)
-        return orig_from_config.__func__(cls, config)
-    
-    initializers_v2.Initializer.from_config = new_from_config
-    
-    # 3. Also patch __init__ of all initializers as backup
-    for name in ['GlorotUniform','GlorotNormal','HeUniform','HeNormal','Zeros','Ones']:
-        if hasattr(initializers_v2, name):
-            Cls = getattr(initializers_v2, name)
-            orig_init = Cls.__init__
-            def make_new(orig):
-                def new_init(self, *a, **kw):
-                    kw.pop('input_axes', None)
-                    kw.pop('output_axes', None)
-                    kw.pop('dtype', None)
-                    return orig(self, *a, **kw)
-                return new_init
-            Cls.__init__ = make_new(orig_init)
-    print("PATCH DONE!")
+patch_initializers()
 
-patch_all()
+# --- PATCH 2: DTypePolicy ---
+# TF 2.10 me DTypePolicy nahi hai, to usko fake banao
+try:
+    import keras.utils.generic_utils as generic_utils
+    orig_class_and_config = generic_utils.class_and_config_for_serialized_keras_object
+    def patched_class_and_config(config, *args, **kwargs):
+        if isinstance(config, dict) and config.get('class_name') == 'DTypePolicy':
+            print("Intercepted DTypePolicy -> returning float32 Policy")
+            # float32 policy return karo
+            return (tf.keras.mixed_precision.Policy, {'name': 'float32'})
+        return orig_class_and_config(config, *args, **kwargs)
+    generic_utils.class_and_config_for_serialized_keras_object = patched_class_and_config
+    print("DTypePolicy patched")
+except Exception as e:
+    print(f"DTypePolicy patch fail: {e}")
 
 from tensorflow.keras.preprocessing import image
 
 app = Flask(__name__)
 model = None
+
 def get_model():
     global model
     if model is None:
-        print("Loading model.h5...")
-        model = tf.keras.models.load_model('model.h5', compile=False)
-        print("LOADED!")
+        print("Loading model.h5 with custom_objects...")
+        # custom_objects me bhi DTypePolicy daal do - double safety
+        custom_objects = {
+            'DTypePolicy': tf.keras.mixed_precision.Policy('float32'),
+            'Policy': tf.keras.mixed_precision.Policy,
+        }
+        model = tf.keras.models.load_model('model.h5', compile=False, custom_objects=custom_objects)
+        print("MODEL LOADED SUCCESSFULLY!")
     return model
 
 classes = ['Pepper__bell___Bacterial_spot','Pepper__bell___healthy','Potato___Early_blight','Potato___Late_blight','Potato___healthy','Tomato_Bacterial_spot','Tomato_Early_blight','Tomato_Late_blight','Tomato_Leaf_Mold','Tomato_Septoria_leaf_spot','Tomato_Spider_mites_Two_spotted_spider_mite','Tomato__Target_Spot','Tomato__Tomato_YellowLeaf__Curl_Virus','Tomato__Tomato_mosaic_virus','Tomato_healthy']
