@@ -1,24 +1,51 @@
 import os
 import numpy as np
 from flask import Flask, request
+
+# --- YEH PATCH HAI, SABSE UPAR LAGANA ZARURI HAI ---
 import tensorflow as tf
+
+# Purane model me batch_shape tha, naye keras me batch_input_shape hota hai
+# Ye patch dono ko ek jaisa bana dega
+try:
+    from keras.engine.input_layer import InputLayer as KerasInputLayer
+    orig_init = KerasInputLayer.__init__
+    def patched_init(self, *args, **kwargs):
+        if 'batch_shape' in kwargs:
+            kwargs['batch_input_shape'] = kwargs.pop('batch_shape')
+        kwargs.pop('optional', None) # ye extra argument hata do
+        return orig_init(self, *args, **kwargs)
+    KerasInputLayer.__init__ = patched_init
+    print("Keras InputLayer Patched!")
+except Exception as e:
+    print(f"Patch warning: {e}")
+
+try:
+    from tensorflow.keras.layers import InputLayer as TfInputLayer
+    orig_tf_init = TfInputLayer.__init__
+    def patched_tf_init(self, *args, **kwargs):
+        if 'batch_shape' in kwargs:
+            kwargs['batch_input_shape'] = kwargs.pop('batch_shape')
+        kwargs.pop('optional', None)
+        return orig_tf_init(self, *args, **kwargs)
+    TfInputLayer.__init__ = patched_tf_init
+except Exception as e:
+    print(f"TF Patch warning: {e}")
+
 from tensorflow.keras.preprocessing import image
+# --- PATCH KHATAM ---
 
 app = Flask(__name__)
 
-# Model lazy load - Render pe memory bachane ke liye
 model = None
-
 def get_model():
     global model
     if model is None:
         print("Loading Model...")
-        # compile=False -> purane model ke liye zaruri hai
         model = tf.keras.models.load_model('model.h5', compile=False)
-        print("Model Loaded!")
+        print("Model Loaded Successfully!")
     return model
 
-# Tumhare model ki 15 classes
 classes = [
     'Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy',
     'Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy',
@@ -37,20 +64,17 @@ def index():
             f = request.files['file']
             farmer_name = request.form.get('name', 'Kisan')
 
-            # Upload folder banao
             upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
             os.makedirs(upload_dir, exist_ok=True)
             path = os.path.join(upload_dir, f.filename)
             f.save(path)
 
-            # Tere model ka size 64x64 hai
             img = image.load_img(path, target_size=(64, 64))
             x = image.img_to_array(img)
             x = np.expand_dims(x, axis=0) / 255.0
             
             pred = m.predict(x)
             result = classes[np.argmax(pred)]
-            # Saaf naam dikhane ke liye
             clean_result = result.replace("___", " - ").replace("__", " ").replace("_", " ")
             confidence = float(np.max(pred) * 100)
 
@@ -75,7 +99,6 @@ def index():
             traceback.print_exc()
             return f"<h3>Error: {e}</h3><pre>{traceback.format_exc()}</pre>"
 
-    # GET - First wala page
     return '''
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Crop Disease Detection</title>
     <style>
