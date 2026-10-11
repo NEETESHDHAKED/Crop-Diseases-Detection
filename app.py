@@ -8,46 +8,45 @@ app = Flask(__name__)
 
 CLASSES = ['Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy', 'Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy', 'Tomato_Bacterial_spot', 'Tomato_Early_blight', 'Tomato_Late_blight', 'Tomato_Leaf_Mold', 'Tomato_Septoria_leaf_spot', 'Tomato_Spider_mites_Two_spotted_spider_mite', 'Tomato__Target_Spot', 'Tomato__Tomato_YellowLeaf__Curl_Virus', 'Tomato__Tomato_mosaic_virus', 'Tomato_healthy']
 
-# Model auto-fix for size mismatch
+# Load pth file
 ckpt = torch.load('potato_model.pth', map_location='cpu')
 sd = ckpt['state_dict'] if isinstance(ckpt, dict) and 'state_dict' in ckpt else ckpt
 
-# Full model saved case
-if not isinstance(sd, dict) or not isinstance(list(sd.values())[0], torch.Tensor):
-    model = ckpt
-    model.eval()
-else:
-    # Find first Linear in_features from saved file
-    fc_in = None
+# Auto detect size
+fc_in = None
+if isinstance(sd, dict):
     for k,v in sd.items():
-        if v.dim()==2 and v.shape[0]==128: # first FC 128 out
+        if isinstance(v, torch.Tensor) and v.dim()==2 and v.shape[0]==128:
             fc_in = v.shape[1]
             break
     if fc_in is None:
         for k,v in sd.items():
-            if 'weight' in k and v.dim()==2:
+            if isinstance(v, torch.Tensor) and v.dim()==2:
                 fc_in = v.shape[1]
                 break
 
-    pool_size = int(math.sqrt(fc_in // 128)) if fc_in else 4
-    print(f"Detected fc_in={fc_in}, using AdaptivePool={pool_size}")
+pool_size = int(math.sqrt(fc_in // 128)) if fc_in else 4
+print(f"Detected fc_in={fc_in}, using AdaptivePool={pool_size}")
 
-    class CNN(nn.Module):
-        def __init__(self, pool):
-            super().__init__()
-            self.cnn = nn.Sequential(
-                nn.Conv2d(3,32,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
-                nn.Conv2d(32,64,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
-                nn.Conv2d(64,128,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
-                nn.AdaptiveAvgPool2d((pool,pool))
-            )
-            self.fc = nn.Sequential(nn.Flatten(), nn.Linear(128*pool*pool,128), nn.ReLU(), nn.Linear(128,15))
-        def forward(self,x):
-            return self.fc(self.cnn(x))
+class CNN(nn.Module):
+    def __init__(self, pool):
+        super().__init__()
+        self.cnn = nn.Sequential(
+            nn.Conv2d(3,32,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(32,64,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(64,128,3,padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.AdaptiveAvgPool2d((pool,pool))
+        )
+        self.fc = nn.Sequential(nn.Flatten(), nn.Linear(128*pool*pool,128), nn.ReLU(), nn.Linear(128,15))
+    def forward(self,x):
+        return self.fc(self.cnn(x))
 
-    model = CNN(pool_size)
+model = CNN(pool_size)
+if isinstance(sd, dict):
     model.load_state_dict(sd, strict=False)
-    model.eval()
+else:
+    model = ckpt
+model.eval()
 
 transform = transforms.Compose([transforms.Resize((128,128)), transforms.ToTensor()])
 
