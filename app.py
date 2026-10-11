@@ -38,16 +38,30 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    file = request.files['file']
-    img = Image.open(file).convert('RGB')
-    x = transform(img).unsqueeze(0)
-    with torch.no_grad():
-        out = model(x)
-        prob = torch.softmax(out,1)[0]
-        idx = prob.argmax().item()
-        pred = CLASSES[idx]
+    try:
+        file = request.files['file']
+        img = Image.open(file.stream).convert('RGB')
 
-        # Agar Late Blight hai to dono possibility dikha de
+        # 1. Hara rang check - patti me hara hona chahiye
+        import numpy as np
+        np_img = np.array(img.resize((100,100)))
+        green_ratio = np.mean((np_img[:,:,1] > 80) & (np_img[:,:,1] > np_img[:,:,0]) & (np_img[:,:,1] > np_img[:,:,2]))
+
+        x = transform(img).unsqueeze(0).to(device)
+        with torch.no_grad():
+            out = model(x)
+            prob = torch.softmax(out, 1)[0]
+            idx = prob.argmax().item()
+            pred = CLASSES[idx]
+            conf = prob[idx].item()*100
+
+        # 2. Agar hara kam hai to patti nahi hai
+        if green_ratio < 0.10: # 10% se kam hara
+            return jsonify({'prediction': '⚠️ Ye patti ki photo nahi hai! Kripya patte ki photo upload karein', 'confidence': '0%'})
+
+        if conf < 60:
+            return jsonify({'prediction': 'Photo clear nahi hai, saaf patte ki photo daalein', 'confidence': f"{conf:.2f}%"})
+
         if "Late_blight" in pred:
             final_pred = "Late Blight (Potato/Tomato) - Fungal disease"
         elif "Early_blight" in pred:
@@ -55,7 +69,9 @@ def predict():
         else:
             final_pred = pred
 
-    return jsonify({'prediction': final_pred, 'confidence': f"{prob[idx].item()*100:.2f}%"})
+        return jsonify({'prediction': final_pred, 'confidence': f"{conf:.2f}%"})
+    except Exception as e:
+        return jsonify({'prediction': f"Error: {str(e)}", 'confidence': "0%"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
