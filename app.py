@@ -21,7 +21,7 @@ def index():
         file_path = os.path.join(upload_path, f.filename)
         f.save(file_path)
 
-        img = image.load_img(file_path, target_size=(128, 128))
+        img = image.load_img(file_path, target_size=(64,64))
         x = image.img_to_array(img)
         x = np.expand_dims(x, axis=0)
         x = x / 255.0
