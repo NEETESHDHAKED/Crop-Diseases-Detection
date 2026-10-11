@@ -45,7 +45,17 @@ def predict():
         out = model(x)
         prob = torch.softmax(out,1)[0]
         idx = prob.argmax().item()
-    return jsonify({'prediction': CLASSES[idx], 'confidence': f"{prob[idx].item()*100:.2f}%"})
+        pred = CLASSES[idx]
+
+        # Agar Late Blight hai to dono possibility dikha de
+        if "Late_blight" in pred:
+            final_pred = "Late Blight (Potato/Tomato) - Fungal disease"
+        elif "Early_blight" in pred:
+            final_pred = "Early Blight (Potato/Tomato)"
+        else:
+            final_pred = pred
+
+    return jsonify({'prediction': final_pred, 'confidence': f"{prob[idx].item()*100:.2f}%"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
