@@ -21,16 +21,14 @@ p{ color:#666; font-size:14px; }
 .upload-box{
   border:2px dashed #66bb6a; border-radius:16px;
   padding:25px; margin:20px 0; cursor:pointer;
-  background:#f1f8e9; transition:0.3s;
+  background:#f1f8e9;
 }
-.upload-box:hover{ background:#e8f5e9; transform:scale(1.02); }
 #preview{ width:100%; border-radius:12px; display:none; margin-top:15px; max-height:250px; object-fit:cover;}
 .btn{
   background:#2e7d32; color:white; border:none;
   padding:14px 0; width:100%; border-radius:12px;
   font-size:16px; cursor:pointer; margin-top:15px;
 }
-.btn i{ margin-right:8px; }
 .result{
   margin-top:20px; padding:15px; border-radius:12px;
   background:#e8f5e9; display:none; text-align:left;
@@ -51,7 +49,7 @@ p{ color:#666; font-size:14px; }
   </div>
 
   <img id="preview">
-  <button class="btn" onclick="predict()"><i class="fa-solid fa-magnifying-glass"></i> Check Karein</button>
+  <button class="btn" id="checkBtn" onclick="predict()"><i class="fa-solid fa-magnifying-glass"></i> <span id="btnText">Check Karein</span></button>
 
   <div id="result" class="result">
     <b><i class="fa-solid fa-bug"></i> Result:</b> <span id="pred"></span><br>
@@ -73,12 +71,22 @@ function showPreview(input){
 async function predict(){
   let file = document.getElementById('file').files[0];
   if(!file){ alert("Pehle photo select karo!"); return; }
+  let btn = document.getElementById('checkBtn');
+  let btnText = document.getElementById('btnText');
+  btn.disabled = true;
+  btnText.innerText = "Checking... ⏳";
   let fd = new FormData(); fd.append('file', file);
-  let res = await fetch('/predict', {method:'POST', body:fd});
-  let data = await res.json();
-  document.getElementById('result').style.display='block';
-  document.getElementById('pred').innerText = data.prediction;
-  document.getElementById('conf').innerText = data.confidence;
+  try{
+    let res = await fetch('/predict', {method:'POST', body:fd});
+    let data = await res.json();
+    document.getElementById('result').style.display='block';
+    document.getElementById('pred').innerText = data.prediction;
+    document.getElementById('conf').innerText = data.confidence;
+  }catch(e){
+    alert("Server slow hai, 10 sec baad try karo");
+  }
+  btn.disabled = false;
+  btnText.innerText = "Check Karein";
 }
 </script>
 </body>
