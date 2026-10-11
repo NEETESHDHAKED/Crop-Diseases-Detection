@@ -1,23 +1,43 @@
 <!DOCTYPE html>
 <html>
-<head><title>Crop Disease Detection</title></head>
-<body style="text-align:center; font-family:Arial; margin-top:50px;">
-<h2>Crop Disease Detection 🌿</h2>
-<form action="/predict" method="POST" enctype="multipart/form-data">
-<input type="file" name="file" required>
-<br><br>
-<button type="submit">Predict</button>
-</form>
-<p id="result"></p>
+<head>
+    <title>Crop Disease Detection</title>
+    <style>
+        body { font-family: Arial; text-align: center; margin-top: 60px; }
+        #result { margin-top: 20px; font-size: 20px; font-weight: bold; color: green; }
+        button { padding: 8px 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Crop Disease Detection 🌿</h2>
+    <form id="form" action="/predict" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <br><br>
+        <button type="submit">Predict</button>
+    </form>
+    <div id="result"></div>
+
 <script>
-const form = document.querySelector('form');
-form.onsubmit = async (e) => {
-  e.preventDefault();
-  const data = new FormData(form);
-  const res = await fetch('/predict', {method:'POST', body:data});
-  const json = await res.json();
-  document.getElementById('result').innerText = "Prediction: " + json.prediction;
-}
+document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerText = "Predicting... ⏳";
+    const formData = new FormData(e.target);
+    try {
+        const res = await fetch('/predict', { method: 'POST', body: formData });
+        const data = await res.json();
+        console.log(data);
+        if(data.prediction){
+            resultDiv.innerText = "Prediction: " + data.prediction;
+        } else {
+            resultDiv.innerText = "Error: " + (data.error || "Something went wrong");
+            resultDiv.style.color = "red";
+        }
+    } catch(err){
+        resultDiv.innerText = "Error: " + err;
+        resultDiv.style.color = "red";
+    }
+});
 </script>
 </body>
 </html>
