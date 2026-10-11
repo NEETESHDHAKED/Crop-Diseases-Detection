@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html>
-<head><title>Kisan App</title></head>
-<body style="font-family: Arial; text-align:center; margin-top:50px;">
-<h2>🌿 Plant Disease Detection</h2>
-<form method="POST" enctype="multipart/form-data" style="border:1px solid #ccc; padding:20px; display:inline-block;">
-  <input type="text" name="farmer_name" placeholder="Kisan ka Naam" required style="padding:8px; width:250px;"><br><br>
-  <input type="file" name="file" required><br><br>
-  <button type="submit" style="padding:10px 20px; background:green; color:white;">Check Karo</button>
+<head><title>Crop Disease Detection</title></head>
+<body style="text-align:center; font-family:Arial; margin-top:50px;">
+<h2>Crop Disease Detection 🌿</h2>
+<form action="/predict" method="POST" enctype="multipart/form-data">
+<input type="file" name="file" required>
+<br><br>
+<button type="submit">Predict</button>
 </form>
-
-{% if prediction %}
-<h3 style="color:red;">Result: {{ prediction }}</h3>
-{% if image_path %}
-<img src="/{{ image_path }}" width="200"><br><br>
-{% endif %}
-<a href="/history">📜 Purana Data Dekho</a>
-{% endif %}
+<p id="result"></p>
+<script>
+const form = document.querySelector('form');
+form.onsubmit = async (e) => {
+  e.preventDefault();
+  const data = new FormData(form);
+  const res = await fetch('/predict', {method:'POST', body:data});
+  const json = await res.json();
+  document.getElementById('result').innerText = "Prediction: " + json.prediction;
+}
+</script>
 </body>
 </html>
