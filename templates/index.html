@@ -1,33 +1,85 @@
 <!DOCTYPE html>
 <html>
-<head><title>Crop Disease Detection</title></head>
-<body style="text-align:center; margin-top:60px; font-family:Arial">
-<h2>Crop Disease Detection 🌿</h2>
-<form id="form" method="POST" enctype="multipart/form-data">
-<input type="file" name="file" required><br><br>
-<button type="submit">Predict</button>
-</form>
-<div id="result" style="margin-top:20px; font-weight:bold;"></div>
+<head>
+<title>Plant Doctor 🌿</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+body{
+  margin:0; font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%);
+  min-height:100vh; display:flex; justify-content:center; align-items:center;
+}
+.card{
+  background:white; width:90%; max-width:420px;
+  border-radius:24px; padding:30px; text-align:center;
+  box-shadow:0 15px 35px rgba(0,0,0,0.15);
+}
+.logo{ font-size:55px; color:#2e7d32; margin-bottom:10px; }
+h1{ margin:5px 0; color:#1b5e20; }
+p{ color:#666; font-size:14px; }
+.upload-box{
+  border:2px dashed #66bb6a; border-radius:16px;
+  padding:25px; margin:20px 0; cursor:pointer;
+  background:#f1f8e9; transition:0.3s;
+}
+.upload-box:hover{ background:#e8f5e9; transform:scale(1.02); }
+#preview{ width:100%; border-radius:12px; display:none; margin-top:15px; max-height:250px; object-fit:cover;}
+.btn{
+  background:#2e7d32; color:white; border:none;
+  padding:14px 0; width:100%; border-radius:12px;
+  font-size:16px; cursor:pointer; margin-top:15px;
+}
+.btn i{ margin-right:8px; }
+.result{
+  margin-top:20px; padding:15px; border-radius:12px;
+  background:#e8f5e9; display:none; text-align:left;
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><i class="fa-solid fa-leaf"></i></div>
+  <h1>Plant Doctor</h1>
+  <p><i class="fa-solid fa-seedling"></i> Aalu, Tamatar, Mirch ke rog ki janch</p>
+
+  <div class="upload-box" onclick="document.getElementById('file').click()">
+    <i class="fa-solid fa-cloud-arrow-up fa-2x" style="color:#43a047"></i><br><br>
+    <b>Photo Upload Karein</b><br>
+    <small>JPG, PNG support</small>
+    <input type="file" id="file" hidden accept="image/*" onchange="showPreview(this)">
+  </div>
+
+  <img id="preview">
+  <button class="btn" onclick="predict()"><i class="fa-solid fa-magnifying-glass"></i> Check Karein</button>
+
+  <div id="result" class="result">
+    <b><i class="fa-solid fa-bug"></i> Result:</b> <span id="pred"></span><br>
+    <b><i class="fa-solid fa-chart-simple"></i> Confidence:</b> <span id="conf"></span>
+  </div>
+</div>
+
 <script>
-document.getElementById('form').addEventListener('submit', async (e)=>{
- e.preventDefault();
- let r = document.getElementById('result');
- r.style.color='black'; r.innerText='Predicting...';
- let fd = new FormData(e.target);
- try{
-   let res = await fetch('/predict',{method:'POST', body:fd});
-   let txt = await res.text();
-   console.log("RAW:",txt);
-   try{
-     let data = JSON.parse(txt);
-     if(data.prediction) { r.style.color='green'; r.innerText='Prediction: '+data.prediction; }
-     else { r.style.color='red'; r.innerText='Error from server: '+(data.error||txt); }
-   }catch{
-     r.style.color='red';
-     r.innerText='Server returned non-JSON (check logs):\n'+txt.slice(0,500);
-   }
- }catch(err){ r.innerText='Fetch Error: '+err; }
-});
+function showPreview(input){
+  if(input.files[0]){
+    let r = new FileReader();
+    r.onload = e => {
+      document.getElementById('preview').src = e.target.result;
+      document.getElementById('preview').style.display='block';
+    }
+    r.readAsDataURL(input.files[0]);
+  }
+}
+async function predict(){
+  let file = document.getElementById('file').files[0];
+  if(!file){ alert("Pehle photo select karo!"); return; }
+  let fd = new FormData(); fd.append('file', file);
+  let res = await fetch('/predict', {method:'POST', body:fd});
+  let data = await res.json();
+  document.getElementById('result').style.display='block';
+  document.getElementById('pred').innerText = data.prediction;
+  document.getElementById('conf').innerText = data.confidence;
+}
 </script>
 </body>
 </html>
