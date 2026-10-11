@@ -1,21 +1,24 @@
 import os
 import numpy as np
 from flask import Flask, request
-from tensorflow.keras.models import load_model
+import tensorflow as tf
 from tensorflow.keras.preprocessing import image
 
 app = Flask(__name__)
 
-# Model ko lazy load karenge taaki memory error na aaye
+# Model lazy load - Render pe memory bachane ke liye
 model = None
+
 def get_model():
     global model
     if model is None:
         print("Loading Model...")
-        model = load_model('model.h5')
+        # compile=False -> purane model ke liye zaruri hai
+        model = tf.keras.models.load_model('model.h5', compile=False)
         print("Model Loaded!")
     return model
 
+# Tumhare model ki 15 classes
 classes = [
     'Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy',
     'Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy',
@@ -34,18 +37,20 @@ def index():
             f = request.files['file']
             farmer_name = request.form.get('name', 'Kisan')
 
+            # Upload folder banao
             upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
             os.makedirs(upload_dir, exist_ok=True)
             path = os.path.join(upload_dir, f.filename)
             f.save(path)
 
-            # 64x64 - tumhare model ke hisab se
+            # Tere model ka size 64x64 hai
             img = image.load_img(path, target_size=(64, 64))
             x = image.img_to_array(img)
             x = np.expand_dims(x, axis=0) / 255.0
             
             pred = m.predict(x)
             result = classes[np.argmax(pred)]
+            # Saaf naam dikhane ke liye
             clean_result = result.replace("___", " - ").replace("__", " ").replace("_", " ")
             confidence = float(np.max(pred) * 100)
 
@@ -70,6 +75,7 @@ def index():
             traceback.print_exc()
             return f"<h3>Error: {e}</h3><pre>{traceback.format_exc()}</pre>"
 
+    # GET - First wala page
     return '''
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Crop Disease Detection</title>
     <style>
@@ -91,4 +97,4 @@ def index():
     '''
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=10000)
