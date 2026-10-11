@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import torch
 import torch.nn as nn
-from torchvision import transforms, models
+from torchvision import transforms
 from PIL import Image
 import os
 import numpy as np
@@ -18,9 +18,6 @@ CLASSES = [
  'Tomato_healthy'
 ]
 
-device = torch.device("cpu")
-
-# Simple CNN Model (tera wala)
 class PlantModel(nn.Module):
     def __init__(self, num_classes=15):
         super().__init__()
@@ -31,55 +28,22 @@ class PlantModel(nn.Module):
         )
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128*8*8, 256), nn.ReLU(), nn.Dropout(0.5),
-            nn.Linear(256, num_classes)
+            nn.Linear(128*4*4, 128),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(128, num_classes)
         )
     def forward(self,x):
         return self.fc(self.cnn(x))
 
-def load_model():
-    ckpt_path = "potato_model.pth"
-    checkpoint = torch.load(ckpt_path, map_location=device)
-
-    # Agar checkpoint dict ke andar hai
-    if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-        checkpoint = checkpoint['state_dict']
-    if isinstance(checkpoint, dict) and 'model_state' in checkpoint:
-        checkpoint = checkpoint['model_state']
-
-    # Check karo ResNet hai kya
-    is_resnet = any('layer1' in k for k in checkpoint.keys()) if isinstance(checkpoint, dict) else False
-
-    if is_resnet:
-        print("ResNet model detected")
-        model = models.resnet18(weights=None)
-        model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
-        model.load_state_dict(checkpoint, strict=False)
-    else:
-        # Agar pura model save kiya hai (not state_dict)
-        if not isinstance(checkpoint, dict) or not all(isinstance(v, torch.Tensor) for v in checkpoint.values()):
-            try:
-                # Direct model object
-                model = torch.load(ckpt_path, map_location=device)
-                if isinstance(model, nn.Module):
-                    return model.eval()
-            except:
-                pass
-
-        print("Simple CNN model detected")
-        model = PlantModel(num_classes=len(CLASSES))
-        try:
-            model.load_state_dict(checkpoint, strict=True)
-        except Exception as e:
-            print(f"Strict load failed: {e}, trying non-strict")
-            model.load_state_dict(checkpoint, strict=False)
-
-    return model.eval()
-
-model = load_model()
+device = torch.device("cpu")
+model = PlantModel(num_classes=len(CLASSES))
+model.load_state_dict(torch.load("potato_model.pth", map_location=device))
+model.eval()
+print("Model loaded successfully!")
 
 transform = transforms.Compose([
-    transforms.Resize((64,64)),
+    transforms.Resize((32,32)),
     transforms.ToTensor()
 ])
 
@@ -108,12 +72,12 @@ def predict():
             return jsonify({'prediction': '⚠️ Ye patte ki photo nahi hai! Patte ki photo daalein', 'confidence': '0%'})
 
         if conf < 50:
-            return jsonify({'prediction': 'Photo clear nahi hai, saaf patte ki photo daalein', 'confidence': f"{conf:.2f}%"})
+            return jsonify({'prediction': 'Photo clear nahi hai', 'confidence': f"{conf:.2f}%"})
 
         clean_pred = pred.replace('___',' - ').replace('__',' ').replace('_',' ')
-        return jsonify({'prediction': clean_pred, 'confidence': f"{conf:.2f}%", 'status':'ok'})
+        return jsonify({'prediction': clean_pred, 'confidence': f"{conf:.2f}%"})
     except Exception as e:
-        print(f"Predict error: {e}")
+        print(f"Error: {e}")
         return jsonify({'prediction': f"Error: {str(e)}", 'confidence': "0%"})
 
 if __name__ == '__main__':
