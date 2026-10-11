@@ -86,23 +86,7 @@ def deep_clean(o):
 def get_model():
     global model
     if model is None:
-        print("Loading...")
-        try:
-            with h5py.File('model.h5','r') as f:
-                mc=f.attrs.get('model_config')
-                if isinstance(mc,bytes): mc=mc.decode()
-                cfg=json.loads(mc); deep_clean(cfg)
-                j=json.dumps(cfg)
-                co={'DTypePolicy':tf.keras.mixed_precision.Policy('float32')}
-                model=tf.keras.models.model_from_json(j,custom_objects=co)
-                model.load_weights('model.h5')
-                print("LOADED VIA JSON!")
-        except Exception as e:
-            print(f"JSON fail {e}, trying direct")
-            import traceback; traceback.print_exc()
-            co={'DTypePolicy':tf.keras.mixed_precision.Policy('float32')}
-            model=tf.keras.models.load_model('model_fixed.h5',compile=False,custom_objects=co)
-            print("LOADED DIRECT!")
+        model = tf.keras.models.load_model('model_fixed.h5', compile=False)
     return model
 
 classes=['Pepper__bell___Bacterial_spot','Pepper__bell___healthy','Potato___Early_blight','Potato___Late_blight','Potato___healthy','Tomato_Bacterial_spot','Tomato_Early_blight','Tomato_Late_blight','Tomato_Leaf_Mold','Tomato_Septoria_leaf_spot','Tomato_Spider_mites_Two_spotted_spider_mite','Tomato__Target_Spot','Tomato__Tomato_YellowLeaf__Curl_Virus','Tomato__Tomato_mosaic_virus','Tomato_healthy']
