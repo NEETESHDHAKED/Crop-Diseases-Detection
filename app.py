@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 from PIL import Image
+import os
 
 app = Flask(__name__)
 
@@ -23,16 +24,19 @@ class CNN(nn.Module):
 model = CNN()
 model.load_state_dict(torch.load('potato_model.pth', map_location='cpu'))
 model.eval()
-
 transform = transforms.Compose([transforms.Resize((128,128)), transforms.ToTensor()])
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
     return render_template('index.html')
 
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['GET','POST'])
 def predict():
-    file = request.files['file']
+    if request.method == 'GET':
+        return "Please upload image from homepage", 200
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file'}), 400
     img = Image.open(file).convert('RGB')
     img = transform(img).unsqueeze(0)
     with torch.no_grad():
@@ -40,4 +44,5 @@ def predict():
     return jsonify({'prediction': CLASSES[pred]})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
