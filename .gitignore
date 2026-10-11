@@ -1,6 +1,10 @@
 venv/
-__pycache__/    
+__pycache__/  
+PlantVillage/
+static/uploads/  
 archive.zip
+farmer_data.db
+model.h5
 *.db
 *.h5
 *.zip
