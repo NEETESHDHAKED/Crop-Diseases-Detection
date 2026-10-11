@@ -1,98 +1,39 @@
-from flask import Flask, render_template, request
-import tensorflow as tf
-from tensorflow.keras.preprocessing import image
-import numpy as np
 import os
-import sqlite3
-from datetime import datetime
+import numpy as np
+from flask import Flask, request, render_template
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
 
 app = Flask(__name__)
-model = tf.keras.models.load_model('model.h5')
-    try:
-        classes = sorted([d for d in os.listdir('PlantVillage') if os.path.isdir(os.path.join('PlantVillage', d))])
-    except:
-        classes = ['Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy', 'Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy', 'Tomato_Bacterial_spot', 'Tomato_Early_blight', 'Tomato_Late_blight', 'Tomato_Leaf_Mold', 'Tomato_Septoria_leaf_spot', 'Tomato_Spider_mites_Two_spotted_spider_mite', 'Tomato__Target_Spot', 'Tomato__Tomato_YellowLeaf__Curl_Virus', 'Tomato__Tomato_mosaic_virus', 'Tomato_healthy']
-def init_db():
-    conn = sqlite3.connect('farmer_data.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS history
-                 (id INTEGER PRIMARY KEY, farmer_name TEXT, disease TEXT,
-                  image_path TEXT, date TEXT)''')
-    conn.commit()
-    conn.close()
 
-init_db()
+# Model load
+model = load_model('model.h5')
 
-@app.route('/', methods=['GET','POST'])
+# Classes - PlantVillage folder server pe nahi hai
+classes = ['Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy', 'Potato___Early_blight', 'Potato___Late_blight', 'Potato___healthy', 'Tomato_Bacterial_spot', 'Tomato_Early_blight', 'Tomato_Late_blight', 'Tomato_Leaf_Mold', 'Tomato_Septoria_leaf_spot', 'Tomato_Spider_mites_Two_spotted_spider_mite', 'Tomato__Target_Spot', 'Tomato__Tomato_YellowLeaf__Curl_Virus', 'Tomato__Tomato_mosaic_virus', 'Tomato_healthy']
+
+@app.route('/', methods=['GET'])
 def index():
-    pred = ""
-    img_path = ""
+    return render_template('index.html')
+
+@app.route('/predict', methods=['POST'])
+def upload():
     if request.method == 'POST':
-        farmer_name = request.form['farmer_name']
         f = request.files['file']
-        os.makedirs('static/uploads', exist_ok=True)
-        img_path = 'static/uploads/' + f.filename
-        f.save(img_path)
+        basepath = os.path.dirname(__file__)
+        file_path = os.path.join(basepath, 'uploads', f.filename)
+        os.makedirs(os.path.join(basepath, 'uploads'), exist_ok=True)
+        f.save(file_path)
 
-        # 1. Load bina normalize kiye
-        img_pil = image.load_img(img_path, target_size=(64,64))
-        img_array_raw = image.img_to_array(img_pil)
+        img = image.load_img(file_path, target_size=(128, 128))
+        x = image.img_to_array(img)
+        x = np.expand_dims(x, axis=0)
+        x = x / 255.0
 
-        # 2. GREEN CHECK - patta hai ya nahi
-        r = img_array_raw[:,:,0]
-        g = img_array_raw[:,:,1]
-        b = img_array_raw[:,:,2]
-        green_mask = (g > 90) & (g > r + 10) & (g > b + 10)
-        green_percent = np.sum(green_mask) / (64*64) * 100
-        print(f"Green Percent: {green_percent:.2f}%")
-
-        if green_percent < 5:
-            pred = "Ye patte ki photo nahi hai! Sahi patte ki photo dalo"
-        else:
-            # 3. Model prediction
-            img = img_array_raw / 255.0
-            img = np.expand_dims(img, axis=0)
-            p = model.predict(img)
-            confidence = np.max(p) * 100
-            raw_pred = classes[np.argmax(p)]
-            print(f"Predicted: {raw_pred} | Confidence: {confidence:.2f}%")
-
-            # 4. FINAL LOGIC - Yahi main fix hai
-            clean_name = raw_pred.replace("___", " - ").replace("_", " ")
-
-            if confidence < 85:
-                # Bilkul hi alag cheez
-                pred = "Ye patte ki photo nahi hai! Sahi patte ki photo dalo"
-            elif "healthy" in raw_pred.lower():
-                # Model ne khud healthy bola
-                pred = f"Ye patta bilkul healthy hai ({clean_name})"
-            elif confidence < 97:
-                # Teri wali new leaf yahi ayegi - 90-96% confidence
-                # Model ko laga bimari hai par confidence kam hai matlab healthy/new leaf hai
-                pred = "Ye patta healthy hai, isme koi bimari nahi hai (New leaf hai)"
-            else:
-                # Pakka bimari hai - 97%+ confidence
-                pred = clean_name
-
-        # DB save
-        conn = sqlite3.connect('farmer_data.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO history (farmer_name, disease, image_path, date) VALUES (?,?,?,?)",
-                  (farmer_name, pred, img_path, datetime.now().strftime("%d-%m-%Y %H:%M")))
-        conn.commit()
-        conn.close()
-        
-    return render_template('index.html', prediction=pred, image_path=img_path)
-
-@app.route('/history')
-def history():
-    conn = sqlite3.connect('farmer_data.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM history ORDER BY id DESC")
-    data = c.fetchall()
-    conn.close()
-    return render_template('history.html', data=data)
+        preds = model.predict(x)
+        result = classes[np.argmax(preds)]
+        return result
+    return None
 
 if __name__ == '__main__':
-    app.run()
-
+    app.run(debug=True)
