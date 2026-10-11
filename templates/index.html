@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Kisan App</title></head>
+<body style="font-family: Arial; text-align:center; margin-top:50px;">
+<h2>🌿 Plant Disease Detection</h2>
+<form method="POST" enctype="multipart/form-data" style="border:1px solid #ccc; padding:20px; display:inline-block;">
+  <input type="text" name="farmer_name" placeholder="Kisan ka Naam" required style="padding:8px; width:250px;"><br><br>
+  <input type="file" name="file" required><br><br>
+  <button type="submit" style="padding:10px 20px; background:green; color:white;">Check Karo</button>
+</form>
+
+{% if prediction %}
+<h3 style="color:red;">Result: {{ prediction }}</h3>
+{% if image_path %}
+<img src="/{{ image_path }}" width="200"><br><br>
+{% endif %}
+<a href="/history">📜 Purana Data Dekho</a>
+{% endif %}
+</body>
+</html>

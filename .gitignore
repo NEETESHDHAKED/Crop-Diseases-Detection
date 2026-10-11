@@ -1,0 +1,6 @@
+venv/
+__pycache__/    
+archive.zip
+*.db
+*.h5
+*.zip

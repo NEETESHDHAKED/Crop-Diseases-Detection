@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial; padding:20px;">
+<h2>📜 Farmer Ka Purana Data</h2>
+<a href="/">⬅ Back to Home</a><br><br>
+<table border="1" cellpadding="10" cellspacing="0">
+<tr style="background:#eee;"><th>ID</th><th>Kisan Naam</th><th>Bimari</th><th>Date</th><th>Photo</th></tr>
+{% for row in data %}
+<tr>
+<td>{{row[0]}}</td>
+<td>{{row[1]}}</td>
+<td>{{row[2]}}</td>
+<td>{{row[4]}}</td>
+<td><img src="/{{row[3]}}" width="80"></td>
+</tr>
+{% endfor %}
+</table>
+</body>
+</html>
